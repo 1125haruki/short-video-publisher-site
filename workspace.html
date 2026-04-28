@@ -303,6 +303,11 @@
         overflow: auto;
         min-height: 220px;
       }
+      #automationSessionJson {
+        min-height: 180px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 13px;
+      }
       video {
         width: 100%;
         border-radius: 18px;
@@ -509,6 +514,27 @@
   "ready": true
 }</pre>
           </article>
+
+          <article class="card" id="automationPanel" hidden>
+            <h2>Automation Session</h2>
+            <p class="muted">
+              Export the connected TikTok session for the local automation runner.
+            </p>
+            <div class="actions">
+              <button class="button-primary" id="exportSessionButton" type="button">Export Session JSON</button>
+              <button class="button-secondary" id="copySessionButton" type="button" disabled>Copy JSON</button>
+              <button class="button-secondary" id="downloadSessionButton" type="button" disabled>Download JSON</button>
+            </div>
+            <div class="meta">
+              <div>
+                <label for="automationSessionJson">Session JSON</label>
+                <textarea id="automationSessionJson" readonly></textarea>
+                <div class="field-hint">
+                  Save with: python3 automation/save_tiktok_session.py --session-file ~/Downloads/tiktok_creator_session_production.json
+                </div>
+              </div>
+            </div>
+          </article>
         </div>
 
         <div class="stack">
@@ -594,6 +620,7 @@
     <script>
       const urlParams = new URLSearchParams(window.location.search);
       const workspaceMode = urlParams.get("mode") === "sandbox" ? "sandbox" : "production";
+      const automationMode = urlParams.get("automation") === "1";
       const workerConfig =
         workspaceMode === "sandbox"
           ? {
@@ -618,6 +645,11 @@
       const loadCreatorInfoButton = document.getElementById("loadCreatorInfoButton");
       const directPostButton = document.getElementById("directPostButton");
       const checkStatusButton = document.getElementById("checkStatusButton");
+      const automationPanel = document.getElementById("automationPanel");
+      const exportSessionButton = document.getElementById("exportSessionButton");
+      const copySessionButton = document.getElementById("copySessionButton");
+      const downloadSessionButton = document.getElementById("downloadSessionButton");
+      const automationSessionJson = document.getElementById("automationSessionJson");
 
       const videoUrlInput = document.getElementById("videoUrl");
       const postTitleInput = document.getElementById("postTitle");
@@ -663,8 +695,10 @@
       const assetPreview = document.getElementById("assetPreview");
 
       const clientSessionStorageKey = `ttClientSession:${workspaceMode}`;
+      let lastAutomationSessionJson = "";
 
       connectButton.href = `${workerBase}/tiktok/connect?return_url=${encodeURIComponent(window.location.href)}`;
+      automationPanel.hidden = !automationMode;
 
       function persistClientSession(clientSession) {
         state.clientSession = clientSession;
@@ -1156,6 +1190,58 @@
         }
       }
 
+      function setAutomationSessionJson(payload) {
+        lastAutomationSessionJson = JSON.stringify(payload, null, 2);
+        automationSessionJson.value = lastAutomationSessionJson;
+        copySessionButton.disabled = false;
+        downloadSessionButton.disabled = false;
+      }
+
+      async function exportAutomationSession() {
+        if (!automationMode) return;
+        setStatus("Exporting TikTok automation session.");
+        try {
+          const data = await callJson("/tiktok/session/export");
+          const exportPayload = {
+            ...data,
+            workerBase,
+          };
+          setAutomationSessionJson(exportPayload);
+          showJson({
+            connected: exportPayload.connected,
+            scope: exportPayload.scope,
+            openId: exportPayload.openId,
+            workerBase: exportPayload.workerBase,
+            exportedAt: exportPayload.exportedAt,
+          });
+          if (!hasScope(exportPayload.scope, "video.list")) {
+            setStatus("Session exported, but `video.list` is not included. Reconnect TikTok after Worker scope update.", true);
+            return;
+          }
+          setStatus("Automation session exported with `video.list`.");
+        } catch (error) {
+          showJson({ error: String(error.message || error), details: error.payload || null });
+          setStatus(`Session export failed: ${error.message || error}`, true);
+        }
+      }
+
+      async function copyAutomationSession() {
+        if (!lastAutomationSessionJson) return;
+        await navigator.clipboard.writeText(lastAutomationSessionJson);
+        setStatus("Automation session JSON copied.");
+      }
+
+      function downloadAutomationSession() {
+        if (!lastAutomationSessionJson) return;
+        const blob = new Blob([lastAutomationSessionJson + "\n"], { type: "application/json" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `tiktok_creator_session_${workspaceMode}.json`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+        setStatus("Automation session JSON downloaded.");
+      }
+
       assetPreview.addEventListener("loadedmetadata", () => {
         const duration = Number(assetPreview.duration);
         state.detectedDurationSec = Number.isFinite(duration) ? Math.round(duration * 10) / 10 : null;
@@ -1173,6 +1259,9 @@
       loadCreatorInfoButton.addEventListener("click", loadCreatorInfo);
       directPostButton.addEventListener("click", directPost);
       checkStatusButton.addEventListener("click", checkStatus);
+      exportSessionButton.addEventListener("click", exportAutomationSession);
+      copySessionButton.addEventListener("click", copyAutomationSession);
+      downloadSessionButton.addEventListener("click", downloadAutomationSession);
 
       function updateBrandDisclosure() {
         const isOrganic = brandOrganicToggleInput.checked;

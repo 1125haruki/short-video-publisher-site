@@ -404,6 +404,29 @@ async function exchangeToken(code, env) {
   return payload;
 }
 
+async function refreshToken(refreshToken, env) {
+  const body = new URLSearchParams({
+    client_key: env.TIKTOK_CLIENT_KEY,
+    client_secret: env.TIKTOK_CLIENT_SECRET,
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  });
+
+  const response = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw createTikTokError(payload, "Token refresh failed", response.status);
+  }
+  return payload;
+}
+
 function computeExpiryIso(expiresIn) {
   const seconds = Number(expiresIn);
   if (!Number.isFinite(seconds) || seconds <= 0) return "";
@@ -639,6 +662,56 @@ async function handleSessionExport(request, env) {
   );
 }
 
+async function handleRefreshToken(request, env) {
+  let refreshTokenValue = request.headers.get("X-TikTok-Refresh-Token") || "";
+  if (!refreshTokenValue && request.method === "POST") {
+    const body = await request.json().catch(() => ({}));
+    refreshTokenValue = body.refreshToken || body.refresh_token || "";
+  }
+  if (!refreshTokenValue) {
+    return withCors(
+      request,
+      env,
+      json(
+        {
+          error: "missing_refresh_token",
+          message: "Send X-TikTok-Refresh-Token or refreshToken in the request body.",
+        },
+        { status: 400 }
+      )
+    );
+  }
+
+  try {
+    const tokenBundle = await refreshToken(refreshTokenValue, env);
+    return withCors(
+      request,
+      env,
+      json({
+        ok: true,
+        accessToken: tokenBundle.access_token || "",
+        refreshToken: tokenBundle.refresh_token || refreshTokenValue,
+        scope: tokenBundle.scope || "",
+        openId: tokenBundle.open_id || "",
+        accessTokenExpiresAt: computeExpiryIso(tokenBundle.expires_in),
+        refreshTokenExpiresAt: computeExpiryIso(tokenBundle.refresh_expires_in),
+      })
+    );
+  } catch (err) {
+    return withCors(
+      request,
+      env,
+      json(
+        {
+          error: err.code || "refresh_failed",
+          message: String(err.message || err),
+        },
+        { status: err.status || 400 }
+      )
+    );
+  }
+}
+
 async function handleCreatorInfo(request, env) {
   const access = requireAccessToken(request, env);
   if (!access.ok) return access.response;
@@ -845,6 +918,7 @@ export default {
               directPost: hasScope(env.TIKTOK_SCOPE || "", "video.publish"),
               videoList: hasScope(env.TIKTOK_SCOPE || "", "video.list"),
               status: true,
+              refreshToken: true,
             },
             sessionBridge: env.CLIENT_SESSION_BRIDGE || "cookie",
           })
@@ -880,6 +954,10 @@ export default {
 
       if (url.pathname === "/tiktok/session/export") {
         return handleSessionExport(request, env);
+      }
+
+      if (url.pathname === "/tiktok/refresh-token" && request.method === "POST") {
+        return handleRefreshToken(request, env);
       }
 
       if (url.pathname === "/tiktok/creator-info" && request.method === "POST") {
