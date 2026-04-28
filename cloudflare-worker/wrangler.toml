@@ -8,7 +8,7 @@ enabled = true
 
 [vars]
 TIKTOK_REDIRECT_URI = "https://tiktok-short-video-publisher-auth.chillsabo1125.workers.dev/tiktok/callback"
-TIKTOK_SCOPE = "user.info.basic,video.upload,video.publish,video.list"
+TIKTOK_SCOPE = "user.info.basic,video.upload,video.publish"
 ALLOWED_ORIGIN = "https://1125haruki.github.io"
 APP_RETURN_URL = "https://1125haruki.github.io/short-video-publisher-site/workspace.html"
 
@@ -19,7 +19,7 @@ workers_dev = true
 [env.sandbox.vars]
 TIKTOK_CLIENT_KEY = "sbaw1gtel1wkhv60c3"
 TIKTOK_REDIRECT_URI = "https://tiktok-short-video-publisher-auth-sandbox.chillsabo1125.workers.dev/tiktok/callback"
-TIKTOK_SCOPE = "user.info.basic,video.upload,video.publish,video.list"
+TIKTOK_SCOPE = "user.info.basic,video.upload,video.publish"
 ALLOWED_ORIGIN = "https://1125haruki.github.io"
 APP_RETURN_URL = "https://1125haruki.github.io/short-video-publisher-site/workspace.html?mode=sandbox"
 CLIENT_SESSION_BRIDGE = "fragment"

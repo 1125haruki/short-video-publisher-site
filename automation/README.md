@@ -26,20 +26,6 @@ TikTok 審査提出や画面収録では使いません。
 - `session export`、bundle JSON、local script は審査動画に含めない
 - 再申請時は `artifacts/review/resubmission-kit-20260408.md` を正本として扱う
 
-## session 保存
-
-1. `https://1125haruki.github.io/short-video-publisher-site/workspace.html?automation=1` を開く
-2. `Connect TikTok` で再接続し、`video.list` を含む scope を承認する
-3. `Export Session JSON` を押し、JSON をダウンロードする
-4. ダウンロードした JSON を保存する
-
-```bash
-python3 automation/save_tiktok_session.py \
-  --session-file ~/Downloads/tiktok_creator_session_production.json
-```
-
-保存先は既定で `/Users/takasuharuki/dev26/ショート動画/state/auth_tokens/tiktok_creator_session.json` です。
-
 ## 投稿スクリプト
 
 ```bash
